@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wasikv
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: wasikv
+  template:
+    metadata:
+      labels:
+        app: wasikv
+    spec:
+      runtimeClassName: wasmtime-wasi
+      containers:
+      - name: wasikv
+        image: ghcr.io/vatsalkeshav/wasikv:latest
+        command: ["/wasikv.wasm"]
+        ports:
+        - containerPort: 8080
