@@ -4,10 +4,11 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-tiny-http = "0.12"
+tiny_http = "0.12"
 
-[lib]
-crate-type = ["cdylib"]
+# commented out because this is a standalone project, not a library
+# [lib]
+# crate-type = ["cdylib"]
 
 [profile.release]
 opt-level = "z"
