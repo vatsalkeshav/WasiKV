@@ -6,7 +6,8 @@
 
 ```sh
 # as guided by wasmedge docs
-sudo apt install -y llvm-14-dev liblld-14-dev software-properties-common gcc g++
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y llvm-14-dev liblld-14-dev software-properties-common gcc g++ asciinema containerd
 
 # as guided by self-exploration
 sudo apt install -y cmake zlib1g-dev build-essential python3 python3-dev python3-pip git
@@ -21,12 +22,10 @@ cd WasmEdge
 mkdir -p build && cd build
 cmake -DCMAKE_BUILD_TYPE=Release -DWASMEDGE_BUILD_TESTS=OFF .. && make -j2 # Note the tests are off and "make -j2" is used instead of "make -j"
 
-#verify
-./tools/wasmedge/wasmedge --version
-./tools/wasmedgec/wasmedgec --version
-
-#install system-wide
+# install wasmedge system-wide
 sudo make install
+
+# verify
 wasmedge --version
 wasmedgec --version
 ```
@@ -42,20 +41,12 @@ make build-wasmedge
 
 # install runwasi - opt a - this may or may not work
 INSTALL="sudo install" LN="sudo ln -sf" make install-wasmedge
-# should show :
+# should show(these are not mistakenly commented-out commands) :
 # mkdir -p /usr/local/bin
 # sudo install ./target/aarch64-unknown-linux-gnu/debug/containerd-shim-wasmedge-v1 /usr/local/bin/
 
-# check installation
-sudo ls /usr/local/bin/containerd-shim-wasmedge-v1
-# should show :
-# /usr/local/bin/containerd-shim-wasmedge-v1
-
-
-# install runwasi - opt b - use if opt a does not work
-cd ~/runwasi
-INSTALL="sudo install" LN="sudo ln -sf" make install-wasmedge
-
+# configure containerd for runwasi's wasmedge shim
+sudo mkdir -p /etc/containerd
 containerd config default | sudo tee /etc/containerd/config.toml >/dev/null
 
 sudo sed -i '/\[plugins\."io\.containerd\.grpc\.v1\.cri"\.containerd\.runtimes\]/a \
@@ -90,7 +81,7 @@ sudo ctr task kill -s SIGKILL testwasm # to stop the song that never ends (or us
 ```sh
 # build
 git clone https://github.com/vatsalkeshav/WASMathician.git
-cd wasm-calculator
+cd WASMathician
 rustup target add wasm32-wasip1
 cargo build --target wasm32-wasip1 --release
 wasmedgec target/wasm32-wasip1/release/wasm-calculator.wasm calculator.wasm
