@@ -26,6 +26,10 @@ sudo usermod -aG docker $USER
 
 # Enable Docker to Start on Boot
 sudo systemctl enable docker
+
+# reboot to rock effect
+sudo reboot
+orb
 ```
 
 2. Kubctl
@@ -43,8 +47,8 @@ sudo apt-get install -y kubectl
 
 3. Kind
 ```bash
-# Install Kind (Linux/amd64 binary)
-curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.27.0/kind-linux-amd64
+# Install Kind (Linux/arm64 binary)
+curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.27.0/kind-linux-arm64
 chmod +x ./kind
 sudo mv ./kind /usr/local/bin/
 

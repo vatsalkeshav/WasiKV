@@ -43,6 +43,8 @@ make build-wasmedge
 # install system-wide
 INSTALL="sudo install" LN="sudo ln -sf" make install-wasmedge
 
+# . . . continue with wasmedge-runwani-kind-song-demo.md from here. . .
+
 # configure containerd for runwasi's wasmedge shim
 sudo mkdir -p /etc/containerd
 
