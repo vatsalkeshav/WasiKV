@@ -1,62 +1,112 @@
-# steps followed to use crun as k3s runtime instead of runc
+# Steps to use crun as default k3s' OCI runtime instead of runc
+
+### 1. *First install crun, then k3s*
+this saves time - as k3s recognizes crun as a runtime upon installation only
 
 ```sh
 # install crun
 sudo apt update
 sudo apt install -y crun
 
-# containerd config file for K3s
-sudo mkdir -p /etc/rancher/k3s/
-sudo tee /etc/rancher/k3s/containerd-config.toml > /dev/null <<EOF
-version = 2
-[plugins."io.containerd.grpc.v1.cri".containerd]
-  default_runtime_name = "crun"
-  [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.crun]
-    runtime_type = "io.containerd.runc.v2"
-    [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.crun.options]
-      BinaryName = "crun"
-EOF
-
-# Install K3s
-curl -sfL https://get.k3s.io | sh -s -
-
-# add crun config
-sudo mkdir -p /etc/rancher/k3s/
-
-sudo tee /etc/rancher/k3s/containerd-config.toml > /dev/null <<EOF
-version = 2
-[plugins."io.containerd.grpc.v1.cri".containerd]
-  default_runtime_name = "crun"
-  [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.crun]
-    runtime_type = "io.containerd.runc.v2"
-    [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.crun.options]
-      BinaryName = "crun"
-EOF
-
-sudo systemctl restart k3s
-
-# try verifying use of crun instead of runc - fail :(
-sudo ctr version
-# Client:
-#   Version:  1.7.27
-#   Revision:
-#   Go version: go1.22.2
-
-# Server:
-#   Version:  1.7.27
-#   Revision:
-#   UUID: eea5551d-83ae-4665-92db-f7ced6f649a6
-# dev@ubuntu:~$ sudo ctr containers ls
-# CONTAINER    IMAGE    RUNTIME
-# dev@ubuntu:~$ sudo kubectl run test --image=nginx
-# pod/test created
-# dev@ubuntu:~$ CONTAINER_ID=$(sudo crictl ps -q --name test)
-# sudo crictl inspect $CONTAINER_ID | grep runtimeType
-#       "runtimeType": "io.containerd.runc.v2",
-#       "runtimeType": "io.containerd.runc.v2",
-#       "runtimeType": "io.containerd.runc.v2",
-#       "runtimeType": "io.containerd.runc.v2",
-#       "runtimeType": "io.containerd.runc.v2",
+# install k3s
+curl -sfL https://get.k3s.io | sh - 
 ```
 
+### 2. *Configure k3s' containerd's config to deffault to crun as OCI runtime*
+k3s uses its own containerd which comes bundled with it
+ 
+```sh
+# check out-of-the-box default runtime
+sudo crictl info | grep -A 10 "defaultRuntime"
+# o/p :
+      "defaultRuntimeName": "runc",
+      "ignoreBlockIONotEnabledErrors": false,
+      "ignoreRdtNotEnabledErrors": false,
+      "runtimes": {
+        "crun": {
+          "ContainerAnnotations": null,
+          "PodAnnotations": null,
+          "baseRuntimeSpec": "",
+          "cniConfDir": "",
+          "cniMaxConfNum": 0,
+          "io_type": "",
 
+# configure k3s own containerd (k3s comes bundled with its own plugin)
+sudo chmod 777 -R /var
+
+# this config.toml.tmpl helps k3s generate it's config.toml(existant in same dir) as a copy of config.toml.tmpl
+touch /var/lib/rancher/k3s/agent/etc/containerd/config.toml.tmpl
+sudo tee /var/lib/rancher/k3s/agent/etc/containerd/config.toml.tmpl > /dev/null <<'EOF'
+version = 3
+root = "/var/lib/rancher/k3s/agent/containerd"
+state = "/run/k3s/containerd"
+
+[grpc]
+  address = "/run/k3s/containerd/containerd.sock"
+
+[plugins.'io.containerd.internal.v1.opt']
+  path = "/var/lib/rancher/k3s/agent/containerd"
+
+[plugins.'io.containerd.grpc.v1.cri']
+  stream_server_address = "127.0.0.1"
+  stream_server_port = "10010"
+
+[plugins.'io.containerd.cri.v1.runtime']
+  enable_selinux = false
+  enable_unprivileged_ports = true
+  enable_unprivileged_icmp = true
+  device_ownership_from_security_context = false
+  default_runtime_name = "crun"
+
+[plugins.'io.containerd.cri.v1.images']
+  snapshotter = "overlayfs"
+  disable_snapshot_annotations = true
+
+[plugins.'io.containerd.cri.v1.images'.pinned_images]
+  sandbox = "rancher/mirrored-pause:3.6"
+
+[plugins.'io.containerd.cri.v1.runtime'.cni]
+  bin_dir = "/var/lib/rancher/k3s/data/cni"
+  conf_dir = "/var/lib/rancher/k3s/agent/etc/cni/net.d"
+
+[plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes.runc]
+  runtime_type = "io.containerd.runc.v2"
+
+[plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes.runc.options]
+  SystemdCgroup = true
+
+[plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes.runhcs-wcow-process]
+  runtime_type = "io.containerd.runhcs.v1"
+
+[plugins."io.containerd.cri.v1.runtime".containerd]
+  default_runtime_name = "crun"
+  [plugins."io.containerd.cri.v1.runtime".containerd.runtimes]
+    [plugins."io.containerd.cri.v1.runtime".containerd.runtimes.crun]
+      runtime_type = "io.containerd.runc.v2"
+      [plugins."io.containerd.cri.v1.runtime".containerd.runtimes.crun.options]
+        BinaryName = "/usr/local/bin/crun"
+        SystemdCgroup = true
+
+[plugins.'io.containerd.cri.v1.images'.registry]
+  config_path = "/var/lib/rancher/k3s/agent/etc/containerd/certs.d"
+EOF
+
+# check out-of-the-box default runtime
+sudo crictl info | grep -A 10 "defaultRuntime"
+# o/p :
+      "defaultRuntimeName": "crun",
+      "ignoreBlockIONotEnabledErrors": false,
+      "ignoreRdtNotEnabledErrors": false,
+      "runtimes": {
+        "crun": {
+          "ContainerAnnotations": null,
+          "PodAnnotations": null,
+          "baseRuntimeSpec": "",
+          "cniConfDir": "",
+          "cniMaxConfNum": 0,
+          "io_type": "",
+```
+
+### *References* - 
+1. https://docs.k3s.io/advanced#configuring-containerd
+2. https://docs.k3s.io/advanced#configuring-containerd
