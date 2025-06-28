@@ -109,4 +109,4 @@ sudo crictl info | grep -A 10 "defaultRuntime"
 
 ### *References* - 
 1. https://docs.k3s.io/advanced#configuring-containerd
-2. https://docs.k3s.io/advanced#configuring-containerd
+2. https://github.com/containerd/containerd/blob/release/2.0/docs/cri/config.md#runtime-classes
